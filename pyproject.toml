@@ -1,0 +1,109 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "model-encryption"
+dynamic = ["version"]
+description = "A tool for signing & encrypting and verifying & decrypting ML models"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [
+  { name = "Stefan Berger", email = "stefanb@us.ibm.com" },
+  { name = "Zhongshu Gu", email = "zgu@us.ibm.com" }
+]
+classifiers = [
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Topic :: Security",
+  "Topic :: Security :: Cryptography",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Typing :: Typed",
+]
+dependencies = [
+  "model-signing",
+  "tqdm",
+]
+requires-python = ">=3.9"
+keywords = [
+  "machine learning",
+  "artificial intelligence",
+  "model signing",
+  "model encryption",
+  "AI security",
+  "ML security",
+  "AI supply chain security",
+  "ML supply chain security",
+]
+
+[project.scripts]
+model_security = "model_encryption._cli:main"
+
+[tool.hatch.version]
+path = "src/model_encryption/__init__.py"
+
+[tool.hatch.build]
+packages = ["src/model_encryption"]
+
+[tool.hatch.envs.hatch-test]
+installer = "pip"
+parallel = true
+randomize = true
+extra-args = ["-m", "not integration"]
+
+[[tool.hatch.envs.hatch-test.matrix]]
+python = ["3.9", "3.10", "3.11", "3.12", "3.13"]
+
+[tool.hatch.envs.type]
+description = """Custom environment for pytype.
+Use `hatch run type:check` to check types.
+"""
+extra-dependencies = [
+  "pytest",
+  "pytype",
+]
+installer = "pip"
+python = "3.12"
+
+[tool.hatch.envs.type.scripts]
+check = "pytype -k -j auto src"
+
+[tool.ruff]
+line-length = 80
+
+[tool.ruff.format]
+docstring-code-format = true
+line-ending = "lf"
+skip-magic-trailing-comma = true
+
+[tool.ruff.lint]
+select = ["B", "D", "E", "F", "I", "N", "PLC", "PLE", "PT", "SIM", "UP", "W"]
+ignore = [
+  # TODO: selectively enable back most of these in subsequent PRs
+  "B024", "D100", "D101", "D102", "D103", "D104", "D105", "D107", "D417",
+  # Unnecessary arguments can help with clarity
+  "UP012", "UP015"
+]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.ruff.lint.flake8-pytest-style]
+fixture-parentheses = false
+
+[tool.ruff.lint.isort]
+force-single-line = true
+force-sort-within-sections = true
+lines-after-imports = 2
+single-line-exclusions = ["collections.abc", "typing"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"

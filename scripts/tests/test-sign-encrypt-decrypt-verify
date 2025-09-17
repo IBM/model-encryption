@@ -1,0 +1,333 @@
+#!/usr/bin/env bash
+
+DIR=${PWD}/$(dirname "$0")
+TMPDIR=$(mktemp -d) || exit 1
+signfile1="${TMPDIR}/signme-1"   # Will     be encrypted; will     be signed
+signfile2="${TMPDIR}/signme-2"   # Will     be encrypted; will     be signed
+ignorefile="${TMPDIR}/ignore"    # Will     be encrypted; will not be signed; will be signed after encryption
+hiddenfile="${TMPDIR}/.hidden"   # Will not be encrypted; will     be signed
+gitdir="${TMPDIR}/.git"		 # Will not be encrypted; will not be signed
+somedir="${TMPDIR}/somedir"	 # Will     be encrypted; will     be signed
+sigfile="${TMPDIR}/model.sig"
+sigfile2="${TMPDIR}/model.sig2"
+aeskeyfile="$(mktemp)" || exit 1
+aeskeyfile2="$(mktemp)" || exit 1
+echo "signme-1" > "${signfile1}"
+echo "signme-2" > "${signfile2}"
+echo "ignore" > "${ignorefile}"
+echo "hidden" > "${hiddenfile}"
+mkdir -p "${gitdir}"
+echo "foo" > "${gitdir}/foo"
+mkdir -p "${somedir}"
+echo "somefile" > "${somedir}/somefile"
+dd if=/dev/urandom bs=1 count=32 of="${aeskeyfile}" status=none || exit 1
+dd if=/dev/urandom bs=1 count=32 of="${aeskeyfile2}" status=none || exit 1
+
+cleanup()
+{
+	rm -rf "${TMPDIR}" "${aeskeyfile}"
+}
+trap cleanup EXIT QUIT
+
+source "${DIR}/functions"
+
+echo "Testing 'sign/verify key'"
+
+if ! model_security \
+	sign+encrypt key \
+	--signature "${sigfile}" \
+	--private_key ./keys/certificate/signing-key.pem \
+	--ignore-paths "${ignorefile}" \
+	--ignore-paths "${gitdir}" \
+	--encryption-key "${aeskeyfile}" \
+	--no_use_progress_bar \
+	"${TMPDIR}"; then
+	echo "Error: 'sign+encrypt key' failed"
+	exit 1
+fi
+
+if ! model_security \
+	decrypt+verify key \
+	--signature "${sigfile}" \
+	--public_key ./keys/certificate/signing-key-pub.pem \
+	--ignore-paths "${ignorefile}" \
+	--ignore-paths "${gitdir}" \
+	--encryption-key "${aeskeyfile}" \
+	--no_use_progress_bar \
+	"${TMPDIR}"; then
+	echo "Error: 'decrypt+verify key' failed"
+	exit 1
+fi
+
+if ! model_security \
+	decrypt+verify key \
+	--signature "${sigfile}" \
+	--public_key ./keys/certificate/signing-key-pub.pem \
+	--ignore-paths "${ignorefile}" \
+	--ignore-paths "${gitdir}" \
+	--encryption-key "${aeskeyfile}" \
+	--no_use_progress_bar \
+	"${TMPDIR}"; then
+	echo "Error: 'decrypt+verify key' failed on 2nd run"
+	exit 1
+fi
+
+# nothing to decrypt anymore; should 'work'
+if ! model_security \
+	decrypt aes-256 \
+	--encryption-key "${aeskeyfile}" \
+	--no_use_progress_bar \
+	"${TMPDIR}"; then
+	echo "Error: 'decrypt key' failed on 3rd run"
+	exit 1
+fi
+
+# Check which files are part of signature
+res=$(get_signed_files "${sigfile}")
+exp='[".hidden","signme-1","signme-2","somedir/somefile"]'
+if [ "${res}" != "${exp}" ]; then
+	echo "Error: Unexpected files were signed"
+	echo "Expected: ${exp}"
+	echo "Actual  : ${res}"
+	exit 1
+fi
+rm -f "${sigfile}"
+
+if ! model_security \
+	encrypt+sign key \
+	--signature "${sigfile}" \
+	--private_key ./keys/certificate/signing-key.pem \
+	--ignore-paths "${ignorefile}" \
+	--ignore-paths "${gitdir}" \
+	--encryption-key "${aeskeyfile}" \
+	--no_use_progress_bar \
+	"${TMPDIR}"; then
+	echo "Error: 'encrypt+sign key' failed"
+	exit 1
+fi
+
+if ! model_security \
+	verify+decrypt key \
+	--signature "${sigfile}" \
+	--public_key ./keys/certificate/signing-key-pub.pem \
+	--ignore-paths "${ignorefile}" \
+	--ignore-paths "${gitdir}" \
+	--encryption-key "${aeskeyfile}" \
+	--no_use_progress_bar \
+	"${TMPDIR}"; then
+	echo "Error: 'verify+decrypt key' failed"
+	exit 1
+fi
+
+if model_security \
+	verify+decrypt key \
+	--signature "${sigfile}" \
+	--public_key ./keys/certificate/signing-key-pub.pem \
+	--ignore-paths "${ignorefile}" \
+	--ignore-paths "${gitdir}" \
+	--encryption-key "${aeskeyfile}" \
+	--no_use_progress_bar \
+	"${TMPDIR}" &>/dev/null; then
+	echo "Error: 'verify+decrypt key' worked on 2nd run -- it should have failed"
+	exit 1
+fi
+
+# Nothing to decrypt
+if ! model_security \
+	decrypt aes-256 \
+	--encryption-key "${aeskeyfile}" \
+	--no_use_progress_bar \
+	"${TMPDIR}" &>/dev/null; then
+	echo "Error: 'decrypt aes-256' failed on 3rd run -- it should have worked"
+	exit 1
+fi
+
+# Check which files are part of signature
+res=$(get_signed_files "${sigfile}")
+exp='[".hidden","ignore.enc","signme-1.enc","signme-2.enc","somedir/somefile.enc"]'
+if [ "${res}" != "${exp}" ]; then
+	echo "Error: Unexpected files were signed"
+	echo "Expected: ${exp}"
+	echo "Actual  : ${res}"
+	exit 1
+fi
+rm -f "${sigfile}"
+
+echo
+echo "Testing 'sign/verify' certificate"
+
+if ! model_security \
+	sign+encrypt certificate \
+	--signature "${sigfile}" \
+	--private_key ./keys/certificate/signing-key.pem \
+	--signing_certificate ./keys/certificate/signing-key-cert.pem \
+	--certificate_chain ./keys/certificate/int-ca-cert.pem \
+	--ignore-paths "${ignorefile}" \
+	--ignore-paths "${gitdir}" \
+	--encryption-key "${aeskeyfile}" \
+	--no_use_progress_bar \
+	"${TMPDIR}"; then
+	echo "Error: 'sign+encrypt certificate' failed"
+	exit 1
+fi
+
+if ! model_security \
+	decrypt+verify certificate \
+	--signature "${sigfile}" \
+	--certificate_chain ./keys/certificate/ca-cert.pem \
+	--ignore-paths "${ignorefile}" \
+	--ignore-paths "${gitdir}" \
+	--encryption-key "${aeskeyfile}" \
+	--no_use_progress_bar \
+	"${TMPDIR}"; then
+	echo "Error: 'verify certificate' failed"
+	exit 1
+fi
+
+if ! model_security \
+	decrypt+verify certificate \
+	--signature "${sigfile}" \
+	--certificate_chain ./keys/certificate/ca-cert.pem \
+	--ignore-paths "${ignorefile}" \
+	--ignore-paths "${gitdir}" \
+	--encryption-key "${aeskeyfile}" \
+	--no_use_progress_bar \
+	"${TMPDIR}"; then
+	echo "Error: 'verify certificate' failed on 2nd run"
+	exit 1
+fi
+
+# Check which files are part of signature
+res=$(get_signed_files "${sigfile}")
+exp='[".hidden","signme-1","signme-2","somedir/somefile"]'
+if [ "${res}" != "${exp}" ]; then
+	echo "Error: Unexpected files were signed"
+	echo "Expected: ${exp}"
+	echo "Actual  : ${res}"
+	exit 1
+fi
+check_model_name "${sigfile}" "$(basename "${TMPDIR}")"
+rm -f "${sigfile}"
+
+if ! model_security \
+	encrypt+sign certificate \
+	--signature "${sigfile}" \
+	--private_key ./keys/certificate/signing-key.pem \
+	--signing_certificate ./keys/certificate/signing-key-cert.pem \
+	--certificate_chain ./keys/certificate/int-ca-cert.pem \
+	--ignore-paths "${ignorefile}" \
+	--ignore-paths "${gitdir}" \
+	--encryption-key "${aeskeyfile}" \
+	--no_use_progress_bar \
+	"${TMPDIR}"; then
+	echo "Error: 'encrypt+sign certificate' failed"
+	exit 1
+fi
+
+if ! model_security \
+	verify+decrypt certificate \
+	--signature "${sigfile}" \
+	--certificate_chain ./keys/certificate/ca-cert.pem \
+	--ignore-paths "${ignorefile}" \
+	--ignore-paths "${gitdir}" \
+	--encryption-key "${aeskeyfile}" \
+	--no_use_progress_bar \
+	"${TMPDIR}"; then
+	echo "Error: 'verify+decrypt certificate' failed"
+	exit 1
+fi
+
+if model_security \
+	verify+decrypt certificate \
+	--signature "${sigfile}" \
+	--certificate_chain ./keys/certificate/ca-cert.pem \
+	--ignore-paths "${ignorefile}" \
+	--ignore-paths "${gitdir}" \
+	--encryption-key "${aeskeyfile}" \
+	--no_use_progress_bar \
+	"${TMPDIR}" &>/dev/null; then
+	echo "Error: 'verify+decrypt certificate' worked on 2nd run -- it should have failed"
+	exit 1
+fi
+
+# Check which files are part of signature
+res=$(get_signed_files "${sigfile}")
+exp='[".hidden","ignore.enc","signme-1.enc","signme-2.enc","somedir/somefile.enc"]'
+if [ "${res}" != "${exp}" ]; then
+	echo "Error: Unexpected files were signed"
+	echo "Expected: ${exp}"
+	echo "Actual  : ${res}"
+	exit 1
+fi
+check_model_name "${sigfile}" "$(basename "${TMPDIR}")"
+rm -f "${sigfile}"
+
+
+# Encrypt+sign twice
+echo
+echo "Testing double-'encrypt+sign certificate'"
+
+if ! model_security \
+	encrypt+sign certificate \
+	--signature "${sigfile}" \
+	--private_key ./keys/certificate/signing-key.pem \
+	--signing_certificate ./keys/certificate/signing-key-cert.pem \
+	--certificate_chain ./keys/certificate/int-ca-cert.pem \
+	--ignore-paths "${ignorefile}" \
+	--ignore-paths "${gitdir}" \
+	--encryption-key "${aeskeyfile}" \
+	--no_use_progress_bar \
+	"${TMPDIR}"; then
+	echo "Error: 'encrypt+sign certificate' failed"
+	exit 1
+fi
+
+if ! model_security \
+	encrypt+sign certificate \
+	--signature "${sigfile2}" \
+	--private_key ./keys/certificate/signing-key.pem \
+	--signing_certificate ./keys/certificate/signing-key-cert.pem \
+	--certificate_chain ./keys/certificate/int-ca-cert.pem \
+	--ignore-paths "${ignorefile}" \
+	--ignore-paths "${gitdir}" \
+	--encryption-key "${aeskeyfile2}" \
+	--no_use_progress_bar \
+	"${TMPDIR}"; then
+	echo "Error: 'encrypt+sign certificate' failed"
+	exit 1
+fi
+
+if ! model_security \
+	verify+decrypt certificate \
+	--signature "${sigfile2}" \
+	--certificate_chain ./keys/certificate/ca-cert.pem \
+	--ignore-paths "${ignorefile}" \
+	--ignore-paths "${gitdir}" \
+	--encryption-key "${aeskeyfile2}" \
+	--no_use_progress_bar \
+	"${TMPDIR}"; then
+	echo "Error: 'verify+decrypt certificate' failed"
+	exit 1
+fi
+# Need to remove sigfile2 since it wasn't there when sigfile was created
+rm -f "${sigfile2}"
+
+if ! model_security \
+	verify+decrypt certificate \
+	--signature "${sigfile}" \
+	--certificate_chain ./keys/certificate/ca-cert.pem \
+	--ignore-paths "${ignorefile}" \
+	--ignore-paths "${gitdir}" \
+	--encryption-key "${aeskeyfile}" \
+	--no_use_progress_bar \
+	"${TMPDIR}"; then
+	ls -l "${TMPDIR}"
+	echo "Error: 'verify+decrypt certificate' failed"
+	exit 1
+fi
+rm -f "${sigfile}"
+
+
+echo "Success!"
+
+exit 0
