@@ -142,6 +142,21 @@ _progress_bar_option = click.option(
 )
 
 
+def _resolve_ignore_paths(
+    model_path: pathlib.Path, paths: Iterable[pathlib.Path]
+) -> list[pathlib.Path]:
+    model_root = model_path.resolve()
+    cwd = pathlib.Path.cwd()
+    resolved_paths = []
+    for p in paths:
+        candidate = (p if p.is_absolute() else (cwd / p)).resolve()
+        try:
+            resolved_paths.append(candidate.relative_to(model_root))
+        except ValueError:
+            continue
+    return resolved_paths
+
+
 class _PKICmdGroup(click.Group):
     """A custom group to configure the supported PKI methods."""
 
@@ -283,14 +298,16 @@ def _encrypt_sign_sigstore(
             use_progress_bar=use_progress_bar,
         )
 
+        ignored = _resolve_ignore_paths(
+            model_path, list(ignore_paths) + [signature]
+        )
         model_signing.signing.Config().use_sigstore_signer(
             use_ambient_credentials=use_ambient_credentials,
             use_staging=use_staging,
             identity_token=identity_token,
         ).set_hashing_config(
             model_signing.hashing.Config().set_ignored_paths(
-                paths=list(ignore_paths) + [signature],
-                ignore_git_paths=ignore_git_paths,
+                paths=ignored, ignore_git_paths=ignore_git_paths
             )
         ).sign(model_path, signature)
     except Exception as err:
@@ -349,12 +366,14 @@ def _encrypt_sign_private_key(
             use_progress_bar=use_progress_bar,
         )
 
+        ignored = _resolve_ignore_paths(
+            model_path, list(ignore_paths) + [signature]
+        )
         model_signing.signing.Config().use_elliptic_key_signer(
             private_key=private_key, password=password
         ).set_hashing_config(
             model_signing.hashing.Config().set_ignored_paths(
-                paths=list(ignore_paths) + [signature],
-                ignore_git_paths=ignore_git_paths,
+                paths=ignored, ignore_git_paths=ignore_git_paths
             )
         ).sign(model_path, signature)
     except Exception as err:
@@ -406,12 +425,14 @@ def _encrypt_sign_pkcs11_key(
             use_progress_bar=use_progress_bar,
         )
 
+        ignored = _resolve_ignore_paths(
+            model_path, list(ignore_paths) + [signature]
+        )
         model_signing.signing.Config().use_pkcs11_signer(
             pkcs11_uri=pkcs11_uri
         ).set_hashing_config(
             model_signing.hashing.Config().set_ignored_paths(
-                paths=list(ignore_paths) + [signature],
-                ignore_git_paths=ignore_git_paths,
+                paths=ignored, ignore_git_paths=ignore_git_paths
             )
         ).sign(model_path, signature)
     except Exception as err:
@@ -470,14 +491,16 @@ def _encrypt_sign_certificate(
             use_progress_bar=use_progress_bar,
         )
 
+        ignored = _resolve_ignore_paths(
+            model_path, list(ignore_paths) + [signature]
+        )
         model_signing.signing.Config().use_certificate_signer(
             private_key=private_key,
             signing_certificate=signing_certificate,
             certificate_chain=certificate_chain,
         ).set_hashing_config(
             model_signing.hashing.Config().set_ignored_paths(
-                paths=list(ignore_paths) + [signature],
-                ignore_git_paths=ignore_git_paths,
+                paths=ignored, ignore_git_paths=ignore_git_paths
             )
         ).sign(model_path, signature)
     except Exception as err:
@@ -537,14 +560,16 @@ def _sign_pkcs11_certificate(
             use_progress_bar=use_progress_bar,
         )
 
+        ignored = _resolve_ignore_paths(
+            model_path, list(ignore_paths) + [signature]
+        )
         model_signing.signing.Config().use_pkcs11_certificate_signer(
             pkcs11_uri=pkcs11_uri,
             signing_certificate=signing_certificate,
             certificate_chain=certificate_chain,
         ).set_hashing_config(
             model_signing.hashing.Config().set_ignored_paths(
-                paths=list(ignore_paths) + [signature],
-                ignore_git_paths=ignore_git_paths,
+                paths=ignored, ignore_git_paths=ignore_git_paths
             )
         ).sign(model_path, signature)
     except Exception as err:
@@ -845,14 +870,16 @@ def _sign_encrypt_sigstore(
     The --encryption-key option is required for AES-256 encryption.
     """
     try:
+        ignored = _resolve_ignore_paths(
+            model_path, list(ignore_paths) + [signature]
+        )
         model_signing.signing.Config().use_sigstore_signer(
             use_ambient_credentials=use_ambient_credentials,
             use_staging=use_staging,
             identity_token=identity_token,
         ).set_hashing_config(
             model_signing.hashing.Config().set_ignored_paths(
-                paths=list(ignore_paths) + [signature],
-                ignore_git_paths=ignore_git_paths,
+                paths=ignored, ignore_git_paths=ignore_git_paths
             )
         ).sign(model_path, signature)
 
@@ -911,12 +938,14 @@ def _sign_encrypt_private_key(
     The --encryption-key option is required for AES-256 encryption.
     """
     try:
+        ignored = _resolve_ignore_paths(
+            model_path, list(ignore_paths) + [signature]
+        )
         model_signing.signing.Config().use_elliptic_key_signer(
             private_key=private_key, password=password
         ).set_hashing_config(
             model_signing.hashing.Config().set_ignored_paths(
-                paths=list(ignore_paths) + [signature],
-                ignore_git_paths=ignore_git_paths,
+                paths=ignored, ignore_git_paths=ignore_git_paths
             )
         ).sign(model_path, signature)
 
@@ -968,12 +997,14 @@ def _sign_encrypt_pkcs11_key(
     The --encryption-key option is required for AES-256 encryption.
     """
     try:
+        ignored = _resolve_ignore_paths(
+            model_path, list(ignore_paths) + [signature]
+        )
         model_signing.signing.Config().use_pkcs11_signer(
             pkcs11_uri=pkcs11_uri
         ).set_hashing_config(
             model_signing.hashing.Config().set_ignored_paths(
-                paths=list(ignore_paths) + [signature],
-                ignore_git_paths=ignore_git_paths,
+                paths=ignored, ignore_git_paths=ignore_git_paths
             )
         ).sign(model_path, signature)
 
@@ -1032,14 +1063,16 @@ def _sign_certificate(
     The --encryption-key option is required for AES-256 encryption.
     """
     try:
+        ignored = _resolve_ignore_paths(
+            model_path, list(ignore_paths) + [signature]
+        )
         model_signing.signing.Config().use_certificate_signer(
             private_key=private_key,
             signing_certificate=signing_certificate,
             certificate_chain=certificate_chain,
         ).set_hashing_config(
             model_signing.hashing.Config().set_ignored_paths(
-                paths=list(ignore_paths) + [signature],
-                ignore_git_paths=ignore_git_paths,
+                paths=ignored, ignore_git_paths=ignore_git_paths
             )
         ).sign(model_path, signature)
 
@@ -1099,14 +1132,16 @@ def _sign_encrypt_pkcs11_certificate(
     The --encryption-key option is required for AES-256 encryption.
     """
     try:
+        ignored = _resolve_ignore_paths(
+            model_path, list(ignore_paths) + [signature]
+        )
         model_signing.signing.Config().use_pkcs11_certificate_signer(
             pkcs11_uri=pkcs11_uri,
             signing_certificate=signing_certificate,
             certificate_chain=certificate_chain,
         ).set_hashing_config(
             model_signing.hashing.Config().set_ignored_paths(
-                paths=list(ignore_paths) + [signature],
-                ignore_git_paths=ignore_git_paths,
+                paths=ignored, ignore_git_paths=ignore_git_paths
             )
         ).sign(model_path, signature)
 
@@ -1197,14 +1232,16 @@ def _decrypt_verify_sigstore(
             encryption_key=encryption_key
         ).decrypt(model_path, use_progress_bar=use_progress_bar)
 
+        ignored = _resolve_ignore_paths(
+            model_path, list(ignore_paths) + [signature]
+        )
         model_signing.verifying.Config().use_sigstore_verifier(
             identity=identity,
             oidc_issuer=identity_provider,
             use_staging=use_staging,
         ).set_hashing_config(
             model_signing.hashing.Config().set_ignored_paths(
-                paths=list(ignore_paths) + [signature],
-                ignore_git_paths=ignore_git_paths,
+                paths=ignored, ignore_git_paths=ignore_git_paths
             )
         ).verify(model_path, signature)
     except Exception as err:
@@ -1259,12 +1296,14 @@ def _decrypt_verify_private_key(
             encryption_key=encryption_key
         ).decrypt(model_path, use_progress_bar=use_progress_bar)
 
+        ignored = _resolve_ignore_paths(
+            model_path, list(ignore_paths) + [signature]
+        )
         model_signing.verifying.Config().use_elliptic_key_verifier(
             public_key=public_key
         ).set_hashing_config(
             model_signing.hashing.Config().set_ignored_paths(
-                paths=list(ignore_paths) + [signature],
-                ignore_git_paths=ignore_git_paths,
+                paths=ignored, ignore_git_paths=ignore_git_paths
             )
         ).verify(model_path, signature)
     except Exception as err:
@@ -1322,13 +1361,15 @@ def _decrypt_verify_certificate(
             encryption_key=encryption_key
         ).decrypt(model_path, use_progress_bar=use_progress_bar)
 
+        ignored = _resolve_ignore_paths(
+            model_path, list(ignore_paths) + [signature]
+        )
         model_signing.verifying.Config().use_certificate_verifier(
             certificate_chain=certificate_chain,
             log_fingerprints=log_fingerprints,
         ).set_hashing_config(
             model_signing.hashing.Config().set_ignored_paths(
-                paths=list(ignore_paths) + [signature],
-                ignore_git_paths=ignore_git_paths,
+                paths=ignored, ignore_git_paths=ignore_git_paths
             )
         ).verify(model_path, signature)
     except Exception as err:
