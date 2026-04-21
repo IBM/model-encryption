@@ -40,7 +40,7 @@ supported.
 
 To sign and encrypt a local model do the following:
 ```bash
-python -m model_security sign+encrypt key \
+python -m model_encryption sign+encrypt key \
      --private_key key.priv \
      --encryption-key aes256.bin \
      --signature granite-3.3-2b-instruct/model.sig \
@@ -49,7 +49,7 @@ python -m model_security sign+encrypt key \
 
 To decrypt and verify the model do the following:
 ```bash
-python -m model_security decrypt+verify key \
+python -m model_encryption decrypt+verify key \
      --public_key key.pub \
      --encryption-key aes256.bin \
      --signature granite-3.3-2b-instruct/model.sig \
@@ -91,7 +91,7 @@ The following methods can be used for creating a certificate chain:
 
 To sign and encrypt a local model with a software key do the following:
 ```bash
-python -m model_security sign+encrypt certificate \
+python -m model_encryption sign+encrypt certificate \
      --private_key signing-key.pem \
      --signing_certificate signing-key-cert.pem \
      --certificate_chain int-ca-cert.pem \
@@ -110,7 +110,7 @@ verification.
 
 To decrypt and verify the model do the following:
 ```bash
-python -m model_security decrypt+verify certificate \
+python -m model_encryption decrypt+verify certificate \
      --certificate_chain ca-cert.pem \
      --encryption-key aes256.bin \
      --signature granite-3.3-2b-instruct/model.sig \
@@ -140,7 +140,7 @@ be assigned to a shell variable 'token' to then sign with Sigstore:
 ```bash
 token=eyJ...
 
-python -m model_security sign+encrypt sigstore \
+python -m model_encryption sign+encrypt sigstore \
      --identity_token "${token}" \
      --encryption-key aes256.bin \
      --signature granite-3.3-2b-instruct/model.sig \
@@ -149,7 +149,7 @@ python -m model_security sign+encrypt sigstore \
 
 To decrypt and verify the model do the following:
 ```bash
-python -m model_security decrypt+verify sigstore \
+python -m model_encryption decrypt+verify sigstore \
      --identity_provider https://sigstore.verify.ibm.com/oauth2 \
      --identity 'email address' \
      --encryption-key aes256.bin \
