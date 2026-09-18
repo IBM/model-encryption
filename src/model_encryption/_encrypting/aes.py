@@ -18,12 +18,12 @@ import os
 import pathlib
 
 from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.decrepit.ciphers import modes
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives import hmac
 from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.primitives.ciphers import Cipher
 from cryptography.hazmat.primitives.ciphers import algorithms
-from cryptography.hazmat.primitives.ciphers import modes
 from tqdm import tqdm
 
 
