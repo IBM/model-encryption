@@ -1,51 +1,55 @@
 #!/usr/bin/env bash
 
 # create root-ca
-certtool \
-	--generate-privkey \
-	--outfile ca-priv.pem
+openssl genrsa -out ca-priv.pem 4096
 
-TEMPLATE="cn=root-ca\nca\ncert_signing_key\nexpiration_days = 3650\n"
-
-certtool \
-	--generate-self-signed \
-	--template <(echo -e "${TEMPLATE}") \
-	--outfile ca-cert.pem \
-	--load-privkey ca-priv.pem
+openssl req -new -x509 \
+	-key ca-priv.pem \
+	-out ca-cert.pem \
+	-days 3650 \
+	-subj "/CN=root-ca" \
+	-extensions v3_ca \
+	-addext "basicConstraints=critical,CA:TRUE" \
+	-addext "keyUsage=critical,keyCertSign,cRLSign"
 
 # create intermediate-ca
-certtool \
-	--generate-privkey \
-	--outfile int-ca-priv.pem
+openssl genrsa -out int-ca-priv.pem 4096
 
-TEMPLATE="cn=intermediate-ca\nca\ncert_signing_key\nexpiration_days = 3650\n"
+openssl req -new \
+	-key int-ca-priv.pem \
+	-out int-ca-csr.pem \
+	-subj "/CN=intermediate-ca"
 
-certtool \
-	--generate-certificate \
-	--template <(echo -e "${TEMPLATE}") \
-	--outfile int-ca-cert.pem \
-	--load-privkey int-ca-priv.pem \
-	--load-ca-privkey ca-priv.pem \
-	--load-ca-certificate ca-cert.pem
+openssl x509 -req \
+	-in int-ca-csr.pem \
+	-CA ca-cert.pem \
+	-CAkey ca-priv.pem \
+	-CAcreateserial \
+	-out int-ca-cert.pem \
+	-days 3650 \
+	-copy_extensions none \
+	-extfile <(printf "basicConstraints=critical,CA:TRUE\nkeyUsage=critical,keyCertSign,cRLSign\n")
+
+rm -f int-ca-csr.pem ca-cert.srl
 
 # code-signing key
-certtool \
-	--generate-privkey \
-	--key-type ecdsa \
-	--curve secp384r1 \
-	--outfile signing-key.pem
+openssl ecparam -name secp384r1 -genkey -noout -out signing-key.pem
 
-TEMPLATE="cn=intermediate-ca\nca\ncode_signing_key\nsigning_key\nexpiration_days = 3650\n"
+openssl req -new \
+	-key signing-key.pem \
+	-out signing-key-csr.pem \
+	-subj "/CN=signing-key"
 
-certtool \
-	--generate-certificate \
-	--template <(echo -e "${TEMPLATE}") \
-	--outfile signing-key-cert.pem \
-	--load-privkey signing-key.pem \
-	--load-ca-privkey int-ca-priv.pem \
-	--load-ca-certificate int-ca-cert.pem
+openssl x509 -req \
+	-in signing-key-csr.pem \
+	-CA int-ca-cert.pem \
+	-CAkey int-ca-priv.pem \
+	-CAcreateserial \
+	-out signing-key-cert.pem \
+	-days 3650 \
+	-copy_extensions none \
+	-extfile <(printf "basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature\nextendedKeyUsage=codeSigning\n")
 
-certtool \
-	--pubkey-info \
-	--load-privkey signing-key.pem \
-	> signing-key-pub.pem
+rm -f signing-key-csr.pem int-ca-cert.srl
+
+openssl ec -in signing-key.pem -pubout -out signing-key-pub.pem
