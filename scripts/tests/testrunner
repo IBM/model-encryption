@@ -12,6 +12,9 @@ DIR=$(dirname "$0")
 
 cd "${DIR}" || exit 1
 
+echo -e "\n>>> Generating test keys"
+(cd keys/certificate && bash gen.sh) || exit 1
+
 for tc in test-*; do
 	echo -e "\n>>> Running ${tc}"
 	./"${tc}" || exit 1
